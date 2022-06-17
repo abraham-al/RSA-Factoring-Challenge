@@ -1,76 +1,145 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <gmp.h>
-
-void file_input(char *filename);
-void factors(mpz_t n);
+#include "rsa.h"
+#include "pollard-rho.c"
 
 /**
- * file_input - read from file
- * @filename: file to read from
- * Return: line
+ * init - Initializes the text buffer with null char
+ *
+ * @buffer: Array that will hold numbers
+ *
+ * Return: None (void function)
  */
-
-void file_input(char *filename)
+void init(char *buffer)
 {
-	char *line = NULL;
-	mpz_t bsize = 0;
-	mpz_t line_to_num;
-	FILE *fp;
+	int i = 0;
 
-	if (filename == NULL)
-		return;
-
-	fp = fopen(filename, "r");
-	if (fp == NULL)
-		return;
-
-	while (getline(&line, &bsize, fp) != -1)
-	{
-		mpz_init_set_str(line_to_num, line, 10);
-		factors(line_to_num);
-	}
-
-	fclose(fp);
-}
-
-
-/**
- * factors - factors the nums
- * @n: number to factor
- * Return: VOID
- */
-
-void factors(mpz_t n)
-{
-	mpz_t i;
-
-	for (i = 2; i < n; i++)
-	{
-		if (n == ((n / i) * i))
-		{
-			printf("%ld=%ld*%ld\n", n, (n / i), i);
-			break;
-		}
-	}
+	for (i = 0; i < S_BUFFER; i++)
+		buffer[i] = '\0';
 }
 
 /**
- * main - main
- * @i: i
- * @av: arg
- * Return: return (0) on success
+ * file2buffer - Reads argv[1] to buffer
+ *
+ * @filename: Pointer to file location
+ *
+ * @buffer: Array that holds the file data
+ *
+ * Return: None (void function)
  */
-
-int main(char **av)
+void file2buffer(char *filename, char *buffer)
 {
-    if (av[1] != NULL)
-	   file_input(av[1]);
+	int opens = 0;
+
+	opens = open(filename, O_RDONLY);
+	if (opens < 0)
+		exit(EXIT_FAILURE);
+
+	if (read(opens, buffer, S_BUFFER) < 0)
+	{
+		close(opens);
+		exit(EXIT_FAILURE);
+	}
+	close(opens);
+}
+
+/**
+ * _atoi - ASCII -> int conversion
+ *
+ * @src: Input char array
+ *
+ * @dest: Converted data array
+ *
+ * Return: Number of elements copied
+ */
+long long unsigned int _atoi(char *src, long long unsigned int *dest)
+{
+	int i = 0;
+
+	for (i = 0; src[i] && src[i] != '\n'; i++)
+		dest[i] = src[i] - '0';
+
+	return (i);
+}
+
+/**
+ * _putint - General agnostic number printing function
+ *
+ * @dest: Array of newly converted data
+ *
+ * @n: Size of array (N is also the principle number in PRho)
+ *
+ * Return: None (void function)
+ */
+void _putint(long long unsigned int *dest, long long unsigned int n)
+{
+	int i = 0;
+
+	for (i = 0; i < n; i++)
+		putchar(dest[i] + '0');
+}
+
+/**
+ * compute - Converts int array to int
+ *
+ * @src: Array of integers forming number
+ *
+ * @n: Number of digits in number
+ *
+ * Return: Integer repr. of array of ints
+ */
+long long unsigned int compute(long long unsigned int *src, long long unsigned int n)
+{
+        int i;
+	long long unsigned int result = 0;
+
+        for (i = 0; i < n; i++)
+	{
+                result *= 10;
+		result += src[i];
+	}
+
+	//printf("result is: %llu\n", result);
+	return result;
+}
+
+/**
+ * main - Entry point
+ *
+ * @argc: Size of argv array
+ *
+ * @argv: Array of CLI inputs
+ *
+ * Return: always 0
+ */
+int main(int argc, char **argv)
+{
+	char buffer[S_BUFFER]; /* original buffer */
+	char *token; /* tokenized buffer */
+
+	long long unsigned int number[VALUE]; /* integer repr. of number */
+	long long unsigned int cv = 1;
+
+	long long unsigned int n; /* final value to compute */
+	long long unsigned int big = 1;
+
+	if (argc != 2)
+		return (EXIT_FAILURE);
+
+	init(buffer);
+	file2buffer(argv[1], buffer);
+	token = strtok(buffer, " \n"); /* separates each number */
+
+	while (token != NULL)
+	{
+		cv = _atoi(token, number); /* converted values */
+
+		n = compute(number, cv);
+		big = n / PollardRho(n);
+		printf("%llu=%llu*%llu\n", n, big, PollardRho(n));
+
+		//_putint(number, cv);
+		//putchar('\n');
+		token = strtok(NULL, " \n"); /* breaks up each number */
+	}
 
 	return (0);
 }
